@@ -303,6 +303,33 @@ void display_string_5x7(byte y,byte x,const char *text)
   
 }
 
+void display_string_8x16(byte y,byte x,const char *text)
+{
+  unsigned char i= 0;
+  unsigned char addrHigh,addrMid,addrLow ;
+  while((text[i]>0x00))
+  {
+    
+    if((text[i]>=0x20) &&(text[i]<=0x7e)) 
+    {           
+      unsigned char fontbuf[16];      
+      fontaddr = (text[i] - 0x20);
+      fontaddr = (unsigned long)(fontaddr*16);
+      fontaddr = (unsigned long)(fontaddr+0x3cf80);     
+      addrHigh = (fontaddr&0xff0000)>>16;
+      addrMid = (fontaddr&0xff00)>>8;
+      addrLow = fontaddr&0xff;
+
+      get_n_bytes_data_from_ROM(addrHigh,addrMid,addrLow,fontbuf,16 );
+      
+      display_graphic_8x16(y,x,fontbuf);
+      i+=1;
+      x+=8;
+    }
+    else
+    i++;  
+  }
+}
 
 /****************************************************************************
 *****************************************************************************
@@ -312,9 +339,10 @@ void display_string_5x7(byte y,byte x,const char *text)
 
 void sendToThingSpeak(const char * key, String mesg)
 {
+    backLightOn();
+    RGB.control(true);
     noInterrupts();
     client.stop();
-    RGB.control(true);
     RGB.color(0,255,0);
     int lt = millis();
     display_string_5x7(6,1,"Wifi");
@@ -356,7 +384,6 @@ void sendToThingSpeak(const char * key, String mesg)
         }
         client.flush();
         client.stop();
-        RGB.control(false);
         display_string_5x7(6,1,"Done          ");
     } 
     else{
@@ -387,6 +414,7 @@ void publishReadings()
 
 void backLightOn()
 {
+    RGB.control(false);
     trigger = millis() + BACKLDUR;
     transfer_command_lcd(0xaf);//--turn on oled panel 
     //display_string_5x7(6,1,"DISP ON ");
@@ -395,6 +423,8 @@ void backLightOn()
 
 void backLightOff()
 {
+    RGB.control(true);
+    RGB.color(0,0,0);
     //display_string_5x7(6,1,"DISP OFF");
     transfer_command_lcd(0xae);//--turn off oled panel 
     refresh=false;
@@ -427,31 +457,31 @@ void readAM2321() {
   switch (result)
   {
     case IDDHTLIB_OK:
-      status = "OK";
+      status = "OK                 ";
       break;
     case IDDHTLIB_ERROR_CHECKSUM:
-      status = "Checksum";
+      status = "Checksum           ";
       break;
     case IDDHTLIB_ERROR_ISR_TIMEOUT:
-      status = "ISR Time out";
+      status = "ISR Time out       ";
       break;
     case IDDHTLIB_ERROR_RESPONSE_TIMEOUT:
-      status = "Response time out";
+      status = "Response time out  ";
       break;
     case IDDHTLIB_ERROR_DATA_TIMEOUT:
-      status = "Data time out";
+      status = "Data time out      ";
       break;
     case IDDHTLIB_ERROR_ACQUIRING:
-      status = "Acquiring";
+      status = "Acquiring          ";
       break;
     case IDDHTLIB_ERROR_DELTA:
       status = "Delta time to small";
       break;
     case IDDHTLIB_ERROR_NOTSTARTED:
-      status = "Not started";
+      status = "Not started        ";
       break;
     default:
-      status = "Unknown";
+      status = "Unknown            ";
       break;
   }
 
@@ -515,11 +545,13 @@ void loop()
       display_string_5x7(1,20,dispCS);
 
       readAM2321();
-      status.toCharArray(dispCS, 18);
+      status.toCharArray(dispCS, 20);
       display_string_5x7(6,1,dispCS);
     
-      sprintf(dispCS, "T: %0.1f, H: %0.1f    ", temp, humi);
-      display_string_5x7(3,1,dispCS);
+//      sprintf(dispCS, "T: %0.1f, H: %0.1f    ", temp, humi);
+//      display_string_5x7(3,1,dispCS);
+      sprintf(dispCS, "%0.1fC, %0.1f%%    ", temp, humi);
+      display_string_8x16(3,1,dispCS);
     }
 
     publishReadings();
@@ -532,8 +564,3 @@ void loop()
 
     delay(500);
 }
-
-
-
-
-
