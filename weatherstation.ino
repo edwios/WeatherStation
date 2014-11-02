@@ -24,6 +24,8 @@ int lastT;
 int BackLightTrigger = D3;
 int trigger = 0;
 bool refresh = true;
+bool readOK = false;
+bool flip = false;
 
 // Pin out defs
 int led = D7;
@@ -402,18 +404,33 @@ int myVersion(String command)
 
 void publishReadings()
 {
+    int res = 1;
+    int tries = 5;
+
     if ((millis() - lastT) > (CHTUPDPERIOD * 1000)) {
+        display_string_5x7(6,1,"Publishing");
         lastT = millis();
-        readAM2321();
-        char szEventInfo[64];
-        sprintf(szEventInfo, "field1=%.1f&field2=%.2f", temp, humi);
-        sendToThingSpeak(WRITEKEY,String(szEventInfo));
+        if (readOK == false) {
+            res = readAM2321();
+            while (res && (tries-- > 0)) {
+              delay(1000);
+              res = readAM2321();
+            }
+        }
+        if (!res || readOK) {
+            readOK = true;
+            char szEventInfo[64];
+            sprintf(szEventInfo, "field1=%.1f&field2=%.2f", temp, humi);
+            sendToThingSpeak(WRITEKEY,String(szEventInfo));
+        }
         Spark.sleep(CHTUPDPERIOD - 30);
     }
 }
 
 void backLightOn()
 {
+    display_string_5x7(6,1,"BL ON ");
+    detachInterrupt(BackLightTrigger);
     RGB.control(false);
     trigger = millis() + BACKLDUR;
     transfer_command_lcd(0xaf);//--turn on oled panel 
@@ -423,11 +440,13 @@ void backLightOn()
 
 void backLightOff()
 {
+    display_string_5x7(6,1,"BL Off");
     RGB.control(true);
     RGB.color(0,0,0);
     //display_string_5x7(6,1,"DISP OFF");
     transfer_command_lcd(0xae);//--turn off oled panel 
     refresh=false;
+    attachInterrupt(BackLightTrigger, backLightOn, RISING);
 }
 
 
@@ -437,14 +456,15 @@ void dht22_wrapper() {
   DHT22.isrCallback();
 }
 
-void readAM2321() {
+int readAM2321() {
   int lt = millis();
   int result;
 
-  detachInterrupt(BackLightTrigger);
+  display_string_5x7(6,1,"Reading...");
     DHT22.acquire();
   while (DHT22.acquiring() && (millis() - lt < TIMEOUT))
     ;
+  //display_string_5x7(6,1,"Done Read ");
   //delay(500);
   //DHT22.acquire();
   //while (DHT22.acquiring())
@@ -484,11 +504,11 @@ void readAM2321() {
       status = "Unknown            ";
       break;
   }
-
+  if (!result) {
     temp = DHT22.getCelsius();
     humi = DHT22.getHumidity();
-    attachInterrupt(BackLightTrigger, backLightOn, RISING);
-
+  }
+  return result;
 }
 
 
@@ -539,19 +559,26 @@ void setup()
 
 void loop()
 {
+    readOK = false;
+    flip = !flip;
+
     if (refresh) {
       Time.timeStr().substring(4,19).toCharArray(dispCS, 16);
       display_string_5x7(1,1,"     ");
       display_string_5x7(1,20,dispCS);
 
-      readAM2321();
-      status.toCharArray(dispCS, 20);
-      display_string_5x7(6,1,dispCS);
-    
-//      sprintf(dispCS, "T: %0.1f, H: %0.1f    ", temp, humi);
-//      display_string_5x7(3,1,dispCS);
-      sprintf(dispCS, "%0.1fC, %0.1f%%    ", temp, humi);
-      display_string_8x16(3,1,dispCS);
+      if (flip) {
+          if (!readAM2321()) {
+            readOK = true;
+            status.toCharArray(dispCS, 20);
+            display_string_5x7(6,1,dispCS);
+          
+      //      sprintf(dispCS, "T: %0.1f, H: %0.1f    ", temp, humi);
+      //      display_string_5x7(3,1,dispCS);
+            sprintf(dispCS, "%0.1fC, %0.1f%%    ", temp, humi);
+            display_string_8x16(3,1,dispCS);
+          }
+      }
     }
 
     publishReadings();
