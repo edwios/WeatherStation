@@ -12,7 +12,7 @@ extern char* itoa(int a, char* buffer, unsigned char radix);
 // Set UPDATE2CLOUD to true if you want the measurement sent to the cloud
 #define UPDATE2CLOUD true 
 // Thingspeak API WRITE key
-#define THINGSPEAK_API_WRITEKEY "89DQON6G9XOGVTR3"
+#define THINGSPEAK_API_WRITEKEY "YOUR_THINGSPEAK_API_WRITEKEY"
 #define version 101
 
 #define BACKLDUR 10000 // 10s
